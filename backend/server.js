@@ -7,11 +7,25 @@ require("dotenv").config();
 
 const app = express();
 
+// ===== CORS — allow local + Vercel domains =====
+const allowedOrigins = [
+  "http://localhost:5500",
+  "http://127.0.0.1:5500",
+  "https://login-system-cortez.vercel.app"
+];
+
 app.use(cors({
-  origin: process.env.FRONTEND_URL || "*"
+  origin: function (origin, callback) {
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.includes(origin)) return callback(null, true);
+    if (origin.endsWith(".vercel.app")) return callback(null, true);
+    return callback(new Error("Not allowed by CORS"));
+  }
 }));
+
 app.use(express.json());
 
+// ===== User model =====
 const userSchema = new mongoose.Schema({
   name: { type: String, required: true },
   email: { type: String, required: true, unique: true, lowercase: true },
@@ -20,10 +34,12 @@ const userSchema = new mongoose.Schema({
 
 const User = mongoose.model("User", userSchema);
 
+// ===== Health check =====
 app.get("/", (req, res) => {
   res.json({ message: "Login API is running." });
 });
 
+// ===== Register =====
 app.post("/api/register", async (req, res) => {
   try {
     const { name, email, password } = req.body;
@@ -51,10 +67,12 @@ app.post("/api/register", async (req, res) => {
 
     res.status(201).json({ message: "Registration successful." });
   } catch (error) {
+    console.error("Register error:", error);
     res.status(500).json({ message: "Server error." });
   }
 });
 
+// ===== Login =====
 app.post("/api/login", async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -84,10 +102,12 @@ app.post("/api/login", async (req, res) => {
       }
     });
   } catch (error) {
+    console.error("Login error:", error);
     res.status(500).json({ message: "Server error." });
   }
 });
 
+// ===== Profile (protected) =====
 app.get("/api/profile", async (req, res) => {
   try {
     const authHeader = req.headers.authorization;
@@ -111,6 +131,7 @@ app.get("/api/profile", async (req, res) => {
   }
 });
 
+// ===== Start server =====
 const PORT = process.env.PORT || 5000;
 
 mongoose.connect(process.env.MONGODB_URI)
